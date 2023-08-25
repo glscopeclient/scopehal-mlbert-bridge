@@ -106,13 +106,13 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>$(CoreLibraryDependencies);%(AdditionalDependencies);MLBert_API.lib</AdditionalDependencies>
+      <AdditionalDependencies>$(CoreLibraryDependencies);%(AdditionalDependencies);MLBert_API.lib;ws2_32.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -132,7 +132,20 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\lib\log\ColoredSTDLogSink.cpp" />
+    <ClCompile Include="..\lib\log\FILELogSink.cpp" />
+    <ClCompile Include="..\lib\log\log.cpp" />
+    <ClCompile Include="..\lib\log\STDLogSink.cpp" />
+    <ClCompile Include="..\lib\scpi-server-tools\BridgeSCPIServer.cpp" />
+    <ClCompile Include="..\lib\scpi-server-tools\SCPIServer.cpp" />
+    <ClCompile Include="..\lib\xptools\Socket.cpp" />
     <ClCompile Include="mlbridge.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\lib\log\log.h" />
+    <ClInclude Include="..\lib\scpi-server-tools\BridgeSCPIServer.h" />
+    <ClInclude Include="..\lib\scpi-server-tools\SCPIServer.h" />
+    <ClInclude Include="..\lib\xptools\Socket.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

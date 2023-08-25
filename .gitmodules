@@ -1,0 +1,9 @@
+[submodule "logtools"]
+	path = lib/log
+	url = ../logtools
+[submodule "scpi-server-tools"]
+	path = lib/scpi-server-tools
+	url = ../scpi-server-tools
+[submodule "xptools"]
+	path = lib/xptools
+	url = ../xptools
