@@ -136,16 +136,16 @@
     <ClCompile Include="..\lib\log\FILELogSink.cpp" />
     <ClCompile Include="..\lib\log\log.cpp" />
     <ClCompile Include="..\lib\log\STDLogSink.cpp" />
-    <ClCompile Include="..\lib\scpi-server-tools\BridgeSCPIServer.cpp" />
     <ClCompile Include="..\lib\scpi-server-tools\SCPIServer.cpp" />
     <ClCompile Include="..\lib\xptools\Socket.cpp" />
+    <ClCompile Include="BertServer.cpp" />
     <ClCompile Include="mlbridge.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\lib\log\log.h" />
-    <ClInclude Include="..\lib\scpi-server-tools\BridgeSCPIServer.h" />
     <ClInclude Include="..\lib\scpi-server-tools\SCPIServer.h" />
     <ClInclude Include="..\lib\xptools\Socket.h" />
+    <ClInclude Include="BertServer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
