@@ -2,9 +2,6 @@
 #include "../lib/log/log.h"
 #include "BertServer.h"
 
-//These APIs are mentioned in the sample code but not in the header??
-extern "C" __declspec(dllimport) double APIGetAPIRev();
-
 using namespace std;
 
 Socket g_scpiSocket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -88,7 +85,7 @@ int main(int argc, char* argv[])
 	}
 	LogVerbose("Successfully connected to ML%d S/N %016llx, running firmware %.1f\n",
 		g_model, g_serial, (float) fw);
-
+		
 	//Get a bunch of info
 	/*
 		ClockIn = 0
@@ -137,7 +134,6 @@ int main(int argc, char* argv[])
 	LogVerbose("Temperatures: TX=%.1f, RX=%.1f\n", temp0, temp1);
 	*/
 
-	/*
 	//Launch the socket server
 	g_scpiSocket.Bind(scpi_port);
 	g_scpiSocket.Listen();
@@ -152,7 +148,7 @@ int main(int argc, char* argv[])
 		//Create a server object for this connection
 		BertServer server(scpiClient.Detach());
 		server.MainLoop();
-	}*/
+	}
 
 	//Done, clean up
 	mlBert_Disconnect(g_hBert);

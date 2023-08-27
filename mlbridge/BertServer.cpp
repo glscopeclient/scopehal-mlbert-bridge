@@ -85,19 +85,28 @@ bool BertServer::OnCommand(
 
 		else if (cmd == "ENABLE")
 		{
-			//APICALL int  STACKMODE mlBert_TXEnable(mlbertapi * instance, int channel, bool Status);
+			bool en = false;
+			if(args[0] == "1")
+				en = true;
+
+			if(!mlBert_TXEnable(g_hBert, chnum, en))
+				LogError("Failed to set TX enable\n");
 		}
 
 		else if (cmd == "PRECURSOR")
 		{
-			//APICALL int  STACKMODE mlBert_PreEmphasis(mlbertapi* instance, int channel, int value);
-			//value 0-100
+			int value = atoi(args[0].c_str());
+
+			if(!mlBert_PreEmphasis(g_hBert, chnum, value))
+				LogError("Failed to set precursor tap\n");
 		}
 
 		else if (cmd == "POSTCURSOR")
 		{
-			//APICALL int  STACKMODE mlBert_PostEmphasis(mlbertapi* instance, int channel, int value);
-			//value 0-100
+			int value = atoi(args[0].c_str());
+
+			if (!mlBert_PostEmphasis(g_hBert, chnum, value))
+				LogError("Failed to set postcursor tap\n");
 		}
 
 		else if (cmd == "INVERT")
