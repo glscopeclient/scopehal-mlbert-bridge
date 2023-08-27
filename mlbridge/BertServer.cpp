@@ -25,6 +25,20 @@ BertServer::~BertServer()
 {
 }
 
+void BertServer::RefreshChannelPolynomialAndInvert(int chnum)
+{
+	if (!mlBert_SetPRBSPattern(
+		g_hBert,
+		chnum,
+		m_txPoly[chnum],
+		m_rxPoly[chnum],
+		m_txInvert[chnum],
+		m_rxInvert[chnum]))
+	{
+		LogError("mlBert_SetPrbsPattern failed\n");
+	}
+}
+
 bool BertServer::OnCommand(
 	const string& line,
 	const string& subject,
@@ -32,120 +46,186 @@ bool BertServer::OnCommand(
 	const vector<string>& args)
 {
 	//If we have a subject, get the channel number
+	//Should be TXn or RXn
+	bool chIsTx = false;
 	int chnum = 0;
+	if (subject[0] == 'T')
+		chIsTx = true;
 	if (subject != "")
-		chnum = atoi(subject.substr(1).c_str()) - 1;
+		chnum = atoi(subject.substr(2).c_str()) - 1;
 	if (chnum < 0)
 		chnum = 0;
 	if (chnum >= 3)
 		chnum = 3;
 
-	//See what the command was
-	if (cmd == "RXPOLY")
+	//TX channel
+	if (chIsTx)
 	{
-		LogDebug("Setting RX polynomial for channel %d to %s\n", chnum, args[0].c_str());
-
-		if (args[0] == "PRBS7")
-			m_rxPoly[chnum] = 0;
-		else if (args[0] == "PRBS9")
-			m_rxPoly[chnum] = 1;
-		else if (args[0] == "PRBS15")
-			m_rxPoly[chnum] = 2;
-		else if (args[0] == "PRBS23")
-			m_rxPoly[chnum] = 3;
-		else if (args[0] == "PRBS31")
-			m_rxPoly[chnum] = 4;
-		else if (args[0] == "AUTO")
-			m_rxPoly[chnum] = 5;
-		else
-			LogWarning("Unrecognized polynomial %s requested", args[0].c_str());
-
-		if (!mlBert_SetPRBSPattern(
-			g_hBert,
-			chnum,
-			m_txPoly[chnum],
-			m_rxPoly[chnum],
-			m_txInvert[chnum],
-			m_rxInvert[chnum]))
+		if (cmd == "POLY")
 		{
-			LogError("mlBert_SetPrbsPattern failed\n");
+			LogDebug("Setting polynomial for %s to %s\n", subject.c_str(), args[0].c_str());
+
+			if (args[0] == "PRBS7")
+				m_txPoly[chnum] = 0;
+			else if (args[0] == "PRBS9")
+				m_txPoly[chnum] = 1;
+			else if (args[0] == "PRBS15")
+				m_txPoly[chnum] = 2;
+			else if (args[0] == "PRBS23")
+				m_txPoly[chnum] = 3;
+			else if (args[0] == "PRBS31")
+				m_txPoly[chnum] = 4;
+			else if (args[0] == "USER")
+				m_txPoly[chnum] = 5;
+			else
+				LogWarning("Unrecognized polynomial %s requested", args[0].c_str());
+
+			RefreshChannelPolynomialAndInvert(chnum);
 		}
-	}
-	else if (cmd == "RXINVERT")
-	{
-		LogDebug("Setting RX invert flag for channel %d to %s\n", chnum, args[0].c_str());
 
-		if (args[0] == "1")
-			m_rxInvert[chnum] = true;
-		else
-			m_rxInvert[chnum] = false;
-
-		if (!mlBert_SetPRBSPattern(
-			g_hBert,
-			chnum,
-			m_txPoly[chnum],
-			m_rxPoly[chnum],
-			m_txInvert[chnum],
-			m_rxInvert[chnum]))
+		else if (cmd == "ENABLE")
 		{
-			LogError("mlBert_SetPrbsPattern failed\n");
+			//APICALL int  STACKMODE mlBert_TXEnable(mlbertapi * instance, int channel, bool Status);
 		}
-	}
-	else if (cmd == "TXPOLY")
-	{
-		LogDebug("Setting polynomial for channel %d to %s\n", chnum, args[0].c_str());
 
-		if (args[0] == "PRBS7")
-			m_txPoly[chnum] = 0;
-		else if (args[0] == "PRBS9")
-			m_txPoly[chnum] = 1;
-		else if (args[0] == "PRBS15")
-			m_txPoly[chnum] = 2;
-		else if (args[0] == "PRBS23")
-			m_txPoly[chnum] = 3;
-		else if (args[0] == "PRBS31")
-			m_txPoly[chnum] = 4;
-		else if (args[0] == "USER")
-			m_txPoly[chnum] = 5;
-		else
-			LogWarning("Unrecognized polynomial %s requested", args[0].c_str());
-
-		if (!mlBert_SetPRBSPattern(
-			g_hBert,
-			chnum,
-			m_txPoly[chnum],
-			m_rxPoly[chnum],
-			m_txInvert[chnum],
-			m_rxInvert[chnum]))
+		else if (cmd == "PRECURSOR")
 		{
-			LogError("mlBert_SetPrbsPattern failed\n");
+			//APICALL int  STACKMODE mlBert_PreEmphasis(mlbertapi* instance, int channel, int value);
+			//value 0-100
 		}
-	}
-	else if (cmd == "TXINVERT")
-	{
-		LogDebug("Setting TX invert flag for channel %d to %s\n", chnum, args[0].c_str());
 
-		if (args[0] == "1")
-			m_txInvert[chnum] = true;
-		else
-			m_txInvert[chnum] = false;
-
-		if (!mlBert_SetPRBSPattern(
-			g_hBert,
-			chnum,
-			m_txPoly[chnum],
-			m_rxPoly[chnum],
-			m_txInvert[chnum],
-			m_rxInvert[chnum]))
+		else if (cmd == "POSTCURSOR")
 		{
-			LogError("mlBert_SetPrbsPattern failed\n");
+			//APICALL int  STACKMODE mlBert_PostEmphasis(mlbertapi* instance, int channel, int value);
+			//value 0-100
+		}
+
+		else if (cmd == "INVERT")
+		{
+			LogDebug("Setting invert flag for %s to %s\n", subject.c_str(), args[0].c_str());
+
+			if (args[0] == "1")
+				m_txInvert[chnum] = true;
+			else
+				m_txInvert[chnum] = false;
+
+			RefreshChannelPolynomialAndInvert(chnum);
+		}
+
+		else if (cmd == "PATTERN")
+		{
+			//16 bit length in low rate mode
+			//40 bit length in high rate mode
+			//APICALL int  STACKMODE mlBert_SetTxUserPattern(mlbertapi* instance, int channel, unsigned long long UserDefinedPattern);
+		}
+
+		//legal values for 4039 are 0, 100, 200, 300, 400
+		else if (cmd == "SWING")
+		{
+			LogDebug("Setting swing for %s to %s\n", subject.c_str(), args[0].c_str());
+
+			if(!mlBert_OutputLevel(g_hBert, chnum, atof(args[0].c_str())))
+				LogError("Failed to set swing\n");
+		}
+
+		else
+		{
+			LogWarning("Unrecognized command %s\n", cmd.c_str());
+			return false;
 		}
 	}
 
+	//RX channel
+	else if (subject != "")
+	{
+		if (cmd == "POLY")
+		{
+			LogDebug("Setting polynomial for channel %s to %s\n", subject.c_str(), args[0].c_str());
+
+			if (args[0] == "PRBS7")
+				m_rxPoly[chnum] = 0;
+			else if (args[0] == "PRBS9")
+				m_rxPoly[chnum] = 1;
+			else if (args[0] == "PRBS15")
+				m_rxPoly[chnum] = 2;
+			else if (args[0] == "PRBS23")
+				m_rxPoly[chnum] = 3;
+			else if (args[0] == "PRBS31")
+				m_rxPoly[chnum] = 4;
+			else if (args[0] == "AUTO")
+				m_rxPoly[chnum] = 5;
+			else
+				LogWarning("Unrecognized polynomial %s requested", args[0].c_str());
+
+			RefreshChannelPolynomialAndInvert(chnum);
+		}
+
+		else if (cmd == "INVERT")
+		{
+			LogDebug("Setting invert flag for %s to %s\n", subject.c_str(), args[0].c_str());
+
+			if (args[0] == "1")
+				m_rxInvert[chnum] = true;
+			else
+				m_rxInvert[chnum] = false;
+
+			RefreshChannelPolynomialAndInvert(chnum);
+		}
+
+		else
+		{
+			LogWarning("Unrecognized command %s\n", cmd.c_str());
+			return false;
+		}
+	}
+
+	//No subject
 	else
 	{
-		LogWarning("Unrecognized command %s\n", cmd.c_str());
-		return false;
+		if (cmd == "CLKOUT")
+		{
+			int ch = 0;
+			int idx = 0;
+
+			if (args[0] == "LO")
+			{
+				//use local oscillator as clock
+				ch = 0;
+				idx = 0;
+
+				//TODO: we can apparently divide this by 2/4/8/16
+				//APICALL int  STACKMODE mlBert_TXClockOut_RateOverEight(mlbertapi* instance);
+				//but how do we get other rates??
+				LogDebug("Setting refclk out mux to LO\n");
+			}
+
+			else
+			{
+				int div = 0;
+				sscanf(args[0].c_str(), "RX%d_DIV%d\n", &ch, &div);
+				ch--;
+				if (div == 8)
+					idx = 1;
+				else
+					idx = 2;
+
+				LogDebug("Setting refclk out mux to RX channel %d, rate/%d\n", ch+1, div);
+			}
+
+			if (1 != mlBert_ClockOut(g_hBert, ch, idx))
+				LogError("failed to set clock out mux\n");
+		}
+		else if (cmd == "RATE")
+		{
+			//TODO
+			// Line rate in Gbps, clock index 0=external, 1=internal
+			//APICALL int  STACKMODE mlBert_LineRateConfiguration(mlbertapi* instance, double lineRate, int clockIndex);
+		}
+		else
+		{
+			LogWarning("Unrecognized command %s\n", cmd.c_str());
+			return false;
+		}
 	}
 
 	return true;
@@ -165,6 +245,8 @@ bool BertServer::OnQuery(
 			g_serial);
 		SendReply(tmp);
 	}
+
+	//APICALL int  STACKMODE mlBert_GetEye(mlbertapi* instance, int channel, double *xValues, double *yValues, double *berValues);
 
 	else
 		return false;

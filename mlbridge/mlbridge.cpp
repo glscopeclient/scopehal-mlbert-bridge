@@ -19,7 +19,7 @@ int main(int argc, char* argv[])
 	Severity console_verbosity = Severity::NOTICE;
 
 	//Parse command-line arguments
-	uint16_t scpi_port = 6025;//5025;
+	uint16_t scpi_port = 5025;
 	for (int i = 1; i < argc; i++)
 	{
 		string s(argv[i]);
@@ -89,17 +89,55 @@ int main(int argc, char* argv[])
 	LogVerbose("Successfully connected to ML%d S/N %016llx, running firmware %.1f\n",
 		g_model, g_serial, (float) fw);
 
+	//Get a bunch of info
+	/*
+		ClockIn = 0
+		LineRate = 1 (rate in Gbps)
+		ClockOut = 2
+			VALUES
+				0=LO
+				1 = CH0 rate/8
+				2 = CH0 rate/16
+				5 = CH1 rate/8
+				6 = CH1 rate/16
+				9 = CH2 rate/8
+				10 = CH2 rate/16
+				13 = CH3 rate/8
+				14 = CH3 rate/16
+		TX_Enable = 3
+		RX_Enable = 4
+		TXPattern = 5
+		CustomPattern = 6
+		TxPattern_length = 7
+		TXInvert = 8
+		OutputLevel = 9 (in mV)
+		RxPattern = 10
+		RxInvert = 11
+		RxPatternLength = 12
+		PatternLock = 13 (doesn't seem to work, always returns nan)
+		PreEmphasis = 14 (percent)
+		PostEmphasis = 15 (percent)
+		ErrorIns = 16,
+		DFEValue = 17 (Or is this CTLE? tap index, in either case)
+		BERTimer = 18
+		BERPhase = 19
+		BERVErticalOffset = 20
+		PhaseSkew = 21
+		(after this not used for 4039)
+	 */
+	double data = 0;
+	if (1 != mlBert_Monitor(g_hBert, 0, 2, &data))
+		LogError("Monitor failed\n");
+	LogDebug("data = %f\n", data);
+
 	/*
 	//Read temperatures
 	double temp0 = mlBert_TempRead(g_hBert, 0);
 	double temp1 = mlBert_TempRead(g_hBert, 1);
 	LogVerbose("Temperatures: TX=%.1f, RX=%.1f\n", temp0, temp1);
-
-	//DEBUG: Set channel 0 to PRBS15
-	if (!mlBert_SetPRBSPattern(g_hBert, 0, 2, 2, 0, 0))
-		LogError("mlBert_SetPrbsPattern failed\n");
 	*/
 
+	/*
 	//Launch the socket server
 	g_scpiSocket.Bind(scpi_port);
 	g_scpiSocket.Listen();
@@ -114,7 +152,7 @@ int main(int argc, char* argv[])
 		//Create a server object for this connection
 		BertServer server(scpiClient.Detach());
 		server.MainLoop();
-	}
+	}*/
 
 	//Done, clean up
 	mlBert_Disconnect(g_hBert);

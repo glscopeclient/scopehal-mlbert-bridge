@@ -21,6 +21,8 @@ protected:
 		const std::string& subject,
 		const std::string& cmd) override;
 
+	void RefreshChannelPolynomialAndInvert(int chnum);
+
 	int m_txPoly[4];
 	int m_rxPoly[4];
 	bool m_txInvert[4];
