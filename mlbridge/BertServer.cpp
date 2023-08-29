@@ -10,6 +10,7 @@ extern uint64_t g_serial;
 
 BertServer::BertServer(ZSOCKET sock)
 	: SCPIServer(sock)
+	, m_deferring(false)
 {
 	//Default everything to PRBS7
 	for (int i = 0; i < 4; i++)
@@ -38,6 +39,22 @@ void BertServer::RefreshChannelPolynomialAndInvert(int chnum)
 		LogError("mlBert_SetPrbsPattern failed\n");
 	}
 }
+
+/*
+void BertServer::SelectUserPatternClockOut()
+{
+	//no i have no idea why this works
+	//this was way too hard to figure out
+	uint16_t value = 0xffff;
+	mlBert_AccessBoardRegister(g_hBert, 1, 0, 0x0a, &value);
+	mlBert_AccessBoardRegister(g_hBert, 1, 0, 0x0b, &value);
+	mlBert_AccessBoardRegister(g_hBert, 1, 1, 0x0103, &value);
+	mlBert_AccessBoardRegister(g_hBert, 1, 0, 0x0103, &value);
+
+	value = 0xd150;
+	mlBert_AccessBoardRegister(g_hBert, 1, 1, 0x0103, &value);
+}
+*/
 
 bool BertServer::OnCommand(
 	const string& line,
@@ -193,23 +210,29 @@ bool BertServer::OnCommand(
 	{
 		if (cmd == "CLKOUT")
 		{
-			int ch = 0;
-			int idx = 0;
-
-			if (args[0] == "LO")
+			if (args[0] == "LO_DIV32")
 			{
-				//use local oscillator as clock
-				ch = 0;
-				idx = 0;
+				LogDebug("Setting refclk out mux to divided LO\n");
 
-				//TODO: we can apparently divide this by 2/4/8/16
-				//APICALL int  STACKMODE mlBert_TXClockOut_RateOverEight(mlbertapi* instance);
-				//but how do we get other rates??
-				LogDebug("Setting refclk out mux to LO\n");
+				//despite the API name this is *not* a 1/8 rate clock for the 4039
+				//but is this actually selecting the serdes???
+				if(1 != mlBert_TXClockOut_RateOverEight(g_hBert))
+					LogError("failed to set clock out mux\n");
 			}
 
+			else if (args[0] == "SERDES")
+			{
+				//This seems to select serdes mode!
+				LogDebug("Setting refclk out mux to SERDES\n");
+				if (1 != mlBert_ClockOut(g_hBert, 0, 0))
+					LogError("failed to set clock out mux\n");
+			}
+
+			//RX
 			else
 			{
+				int ch = 0;
+				int idx = 0;
 				int div = 0;
 				sscanf(args[0].c_str(), "RX%d_DIV%d\n", &ch, &div);
 				ch--;
@@ -219,10 +242,32 @@ bool BertServer::OnCommand(
 					idx = 2;
 
 				LogDebug("Setting refclk out mux to RX channel %d, rate/%d\n", ch+1, div);
-			}
 
-			if (1 != mlBert_ClockOut(g_hBert, ch, idx))
-				LogError("failed to set clock out mux\n");
+				if (1 != mlBert_ClockOut(g_hBert, ch, idx))
+					LogError("failed to set clock out mux\n");
+			}
+		}
+		else if (cmd == "USERPATTERN")
+		{
+			uint64_t userpattern = 0;
+			sscanf(args[0].c_str(), "%llx", &userpattern);
+			LogDebug("Setting user pattern to 0x%llx\n", userpattern);
+
+			//note that for ML4039 at least, this is global not a per channel setting
+			//TODO: 0x211, 212 seems to be a *32 bit* pattern not 16?
+			if(!mlBert_SetTxUserPattern(g_hBert, 0, userpattern))
+				LogError("failed to set user pattern\n");
+		}
+		else if(cmd == "DEFER")
+		{
+			LogDebug("Deferring channel config changes\n");
+			m_deferring = true;
+		}
+		else if (cmd == "APPLY")
+		{
+			for(int i=0; i<4; i++)
+				RefreshChannelPolynomialAndInvert(chnum);
+			m_deferring = false;
 		}
 		else if (cmd == "RATE")
 		{
@@ -245,6 +290,19 @@ bool BertServer::OnQuery(
 	const string& subject,
 	const string& cmd)
 {
+	//If we have a subject, get the channel number
+	//Should be TXn or RXn
+	bool chIsTx = false;
+	int chnum = 0;
+	if (subject[0] == 'T')
+		chIsTx = true;
+	if (subject != "")
+		chnum = atoi(subject.substr(2).c_str()) - 1;
+	if (chnum < 0)
+		chnum = 0;
+	if (chnum >= 3)
+		chnum = 3;
+
 	if (cmd == "*IDN")
 	{
 		char tmp[256];
@@ -254,6 +312,73 @@ bool BertServer::OnQuery(
 			g_serial);
 		SendReply(tmp);
 	}
+
+	//Channel queries
+	else if(subject != "")
+	{
+		if(!chIsTx)
+		{
+			if(cmd == "LOCK")
+			{
+				//very confusingly named (and misspelled) API
+				if(mlBert_PRBSVerfication(g_hBert, chnum))
+					SendReply("1");
+				else
+					SendReply("0");
+			}
+
+			else if(cmd == "HBATHTUB")
+			{
+				//Read a quick bathtub
+				//Docs say we only need 128 entries but we get memory corruption
+				//unless we have 129 entries of space allocated...
+				double xvalues[129] = {0};
+				double berValues[129] = {0};
+				if(!mlBert_GetBathTub(g_hBert, chnum, xvalues, berValues))
+					LogError("Failed to get bathtub\n");
+				if(!mlBert_CalculateBathtubDualDirac(g_hBert, chnum, xvalues, berValues))
+					LogError("Failed to do dual dirac\n");
+
+				char tmp[128];
+				string reply;
+				for(int i=0; i<128; i++)
+				{
+					snprintf(tmp, sizeof(tmp), "%f,%e,", (float)xvalues[i], (float)berValues[i]);
+					reply += tmp;
+				}
+				SendReply(reply);
+			}
+			else
+				return false;
+		}
+
+		//TX channel
+		else
+		{
+			if (cmd == "LOCK")
+			{
+				//for some reason this always seems to be false?
+				bool status = false;
+				if(!mlBert_ReadTXLock(g_hBert, chnum, &status))
+					LogError("failed to read tx lock\n");
+
+				if(status)
+					SendReply("1");
+				else
+					SendReply("0");
+			}
+
+			else
+				return false;
+		}
+	}
+
+	/*
+	//Read temperatures
+	double temp0 = mlBert_TempRead(g_hBert, 0);
+	double temp1 = mlBert_TempRead(g_hBert, 1);
+	LogVerbose("Temperatures: TX=%.1f, RX=%.1f\n", temp0, temp1);
+	*/
 
 	//APICALL int  STACKMODE mlBert_GetEye(mlbertapi* instance, int channel, double *xValues, double *yValues, double *berValues);
 

@@ -27,4 +27,6 @@ protected:
 	int m_rxPoly[4];
 	bool m_txInvert[4];
 	bool m_rxInvert[4];
+
+	bool m_deferring;
 };
