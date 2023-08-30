@@ -41,17 +41,17 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\lib\scpi-server-tools\SCPIServer.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\lib\xptools\Socket.h">
-      <Filter>Source Files</Filter>
+    <ClInclude Include="BertServer.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\lib\log\log.h">
-      <Filter>Source Files</Filter>
+      <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="BertServer.h">
-      <Filter>Source Files</Filter>
+    <ClInclude Include="..\lib\scpi-server-tools\SCPIServer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\lib\xptools\Socket.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

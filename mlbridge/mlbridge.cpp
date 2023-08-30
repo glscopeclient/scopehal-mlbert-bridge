@@ -150,42 +150,10 @@ int main(int argc, char* argv[])
 		TODO: independently rederive these using Skyworkds dspllsim-precision-clock-evb software
 		which I think is the right tool??
 	*/
-	/*if(!mlBert_LineRateConfiguration(g_hBert, 10.0, 1))
-		LogError("Failed to set line rate\n");
-	if(!mlBert_RestoreAllConfig(g_hBert))
-		LogError("Failed to restore config\n");*/
 
 	//dfesetvalue 0.67, 1.34, 2.01, 2.68, 3.35, 4.02, 4.69, 5.36,
 	//6.03, 6.7, 7.37, 8.04, 8.71, 9.38, 10
-
-	//Try writing 0x103 directly
-	/*uint16_t regval = 14;
-	if (!mlBert_AccessBoardRegister(g_hBert, 1, 0, 0x103, &regval))
-		LogError("write 103 failed\n");*/
-
-	//note that this is actually outputting freq/32 despite the name!
-	//mlBert_TXClockOut_RateOverEight(g_hBert);
-	
 	/*
-	for(uint16_t regid=0x000; regid <= 0x500; regid ++)
-	{
-		uint16_t regval;
-		uint16_t lane = 0;
-		if (!mlBert_AccessBoardRegister(g_hBert, 0, lane, regid, &regval))
-			LogError("access reg failed\n");
-		if(regval != 0)
-			LogDebug("regval 0x%04x = %04x\n", regid, regval);
-	}
-	
-
-	//Try changing output clock
-	//Looks like 0x211, 212 are a pattern register!
-	//refclk out is another serdes??
-	*/
-
-	/*
-	
-
 	//then we can do this to select a higher or lower rate
 	value = 0xaaaa;
 	mlBert_AccessBoardRegister(g_hBert, 1, 0, 0x211, &value);

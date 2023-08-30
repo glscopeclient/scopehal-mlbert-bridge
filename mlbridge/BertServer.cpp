@@ -138,13 +138,6 @@ bool BertServer::OnCommand(
 			RefreshChannelPolynomialAndInvert(chnum);
 		}
 
-		else if (cmd == "PATTERN")
-		{
-			//16 bit length in low rate mode
-			//40 bit length in high rate mode
-			//APICALL int  STACKMODE mlBert_SetTxUserPattern(mlbertapi* instance, int channel, unsigned long long UserDefinedPattern);
-		}
-
 		//legal values for 4039 are 0, 100, 200, 300, 400
 		else if (cmd == "SWING")
 		{
@@ -255,6 +248,8 @@ bool BertServer::OnCommand(
 
 			//note that for ML4039 at least, this is global not a per channel setting
 			//TODO: 0x211, 212 seems to be a *32 bit* pattern not 16?
+			//Docs say: 16 bit length in low rate mode
+			//40 bit length in high rate mode
 			if(!mlBert_SetTxUserPattern(g_hBert, 0, userpattern))
 				LogError("failed to set user pattern\n");
 		}
@@ -271,9 +266,23 @@ bool BertServer::OnCommand(
 		}
 		else if (cmd == "RATE")
 		{
-			//TODO
+			int64_t bps = stoll(args[0].c_str());
+			double gbps = bps * 1e-9;
+
+			//TODO: support ext ref clk
+			
 			// Line rate in Gbps, clock index 0=external, 1=internal
-			//APICALL int  STACKMODE mlBert_LineRateConfiguration(mlbertapi* instance, double lineRate, int clockIndex);
+			LogDebug("Setting line rate to %f Gbps\n", gbps);
+			if(!mlBert_LineRateConfiguration(g_hBert, gbps, 1))
+				LogError("Failed to set line rate\n");
+
+			//if in DEFER mode, we're doing initial startup
+			//so don't restore config because we're about to reconfigure everything anyway
+			if(!m_deferring)
+			{
+				if (!mlBert_RestoreAllConfig(g_hBert))
+					LogError("Failed to restore config\n");
+			}
 		}
 		else
 		{
