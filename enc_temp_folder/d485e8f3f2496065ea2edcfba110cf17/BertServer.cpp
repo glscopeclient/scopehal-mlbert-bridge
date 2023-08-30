@@ -370,6 +370,15 @@ bool BertServer::OnQuery(
 				}
 				SendReply(reply);
 
+				/*
+				//DEBUG: write to a file
+				FILE* fp = fopen("../test.csv", "w");
+				fprintf(fp, "x,y,ber\n");
+				for(int i=0; i<32768; i++)
+					fprintf(fp, "%f, %f, %e\n", xvalues[i], yvalues[i], bervalues[i]);
+				fclose(fp);
+				*/
+
 				delete[] xvalues;
 				delete[] yvalues;
 				delete[] bervalues;
@@ -387,7 +396,6 @@ bool BertServer::OnQuery(
 				if(!mlBert_GetBathTub(g_hBert, chnum, xvalues, berValues))
 					LogError("Failed to get bathtub\n");
 
-				//this sometimes fails and gives garbage data for no obvious reason
 				if(!mlBert_CalculateBathtubDualDirac(g_hBert, chnum, xvalues, berValues))
 					LogError("Failed to do dual dirac\n");
 
