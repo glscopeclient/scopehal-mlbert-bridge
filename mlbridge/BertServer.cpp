@@ -97,7 +97,8 @@ bool BertServer::OnCommand(
 			else
 				LogWarning("Unrecognized polynomial %s requested", args[0].c_str());
 
-			RefreshChannelPolynomialAndInvert(chnum);
+			if(!m_deferring)
+				RefreshChannelPolynomialAndInvert(chnum);
 		}
 
 		else if (cmd == "ENABLE")
@@ -135,7 +136,8 @@ bool BertServer::OnCommand(
 			else
 				m_txInvert[chnum] = false;
 
-			RefreshChannelPolynomialAndInvert(chnum);
+			if (!m_deferring)
+				RefreshChannelPolynomialAndInvert(chnum);
 		}
 
 		//legal values for 4039 are 0, 100, 200, 300, 400
@@ -176,7 +178,21 @@ bool BertServer::OnCommand(
 			else
 				LogWarning("Unrecognized polynomial %s requested", args[0].c_str());
 
-			RefreshChannelPolynomialAndInvert(chnum);
+			if (!m_deferring)
+				RefreshChannelPolynomialAndInvert(chnum);
+		}
+
+		else if (cmd == "CTLESTEP")
+		{
+			//CTLE gain step
+			//note that the API is called DFE, and the popup dialog in the GUI calls it a DFE,
+			//but all other signs point to it actually being a CTLE!
+			//(datasheet and table header call it a CTLE, and it only has a single gain setting rather than per-tap cursor values)
+			LogDebug("Setting CTLE step for channel %s to %s\n", subject.c_str(), args[0].c_str());
+			auto step = atoi(args[0].c_str());
+
+			if(!mlBert_DFESetValue(g_hBert, chnum, step))
+				LogError("Failed to set tap value\n");
 		}
 
 		else if (cmd == "INVERT")
@@ -188,7 +204,8 @@ bool BertServer::OnCommand(
 			else
 				m_rxInvert[chnum] = false;
 
-			RefreshChannelPolynomialAndInvert(chnum);
+			if (!m_deferring)
+				RefreshChannelPolynomialAndInvert(chnum);
 		}
 
 		else
@@ -260,8 +277,11 @@ bool BertServer::OnCommand(
 		}
 		else if (cmd == "APPLY")
 		{
+			LogDebug("Applying deferred channel config\n");
+
 			for(int i=0; i<4; i++)
 				RefreshChannelPolynomialAndInvert(chnum);
+
 			m_deferring = false;
 		}
 		else if (cmd == "RATE")
