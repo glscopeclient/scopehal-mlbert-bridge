@@ -151,10 +151,8 @@ int main(int argc, char* argv[])
 		which I think is the right tool??
 	*/
 
-	//dfesetvalue 0.67, 1.34, 2.01, 2.68, 3.35, 4.02, 4.69, 5.36,
-	//6.03, 6.7, 7.37, 8.04, 8.71, 9.38, 10
 	/*
-	//then we can do this to select a higher or lower rate
+	//low level 32 bit pattern access
 	value = 0xaaaa;
 	mlBert_AccessBoardRegister(g_hBert, 1, 0, 0x211, &value);
 	value = 0xaaaa;

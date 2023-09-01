@@ -20,6 +20,8 @@ BertServer::BertServer(ZSOCKET sock)
 		m_txInvert[i] = false;
 		m_rxInvert[i] = false;
 	}
+
+	m_integrationLength = 1e6;
 }
 
 BertServer::~BertServer()
@@ -284,6 +286,10 @@ bool BertServer::OnCommand(
 
 			m_deferring = false;
 		}
+		else if (cmd == "INTEGRATION")
+		{
+			m_integrationLength = stoll(args[0].c_str());
+		}
 		else if (cmd == "RATE")
 		{
 			int64_t bps = stoll(args[0].c_str());
@@ -302,6 +308,9 @@ bool BertServer::OnCommand(
 			{
 				if (!mlBert_RestoreAllConfig(g_hBert))
 					LogError("Failed to restore config\n");
+
+				for (int i = 0; i < 4; i++)
+					RefreshChannelPolynomialAndInvert(chnum);
 			}
 		}
 		else
@@ -342,6 +351,31 @@ bool BertServer::OnQuery(
 		SendReply(tmp);
 	}
 
+	else if(cmd == "BER")
+	{
+		//TODO: make this configurable
+		//take measurement at center of eye
+		//APICALL int  STACKMODE mlBert_ChangeBERPhaseAndOffset_pS_mV(mlbertapi* instance, int Channel, int phase, int Amplitude);
+		for(int i=0; i<4; i++)
+		{
+			if(!mlBert_ChangeBERPhase(g_hBert, i, 64, 128))
+				LogError("Failed to set BER phase\n");
+		}
+
+		//Reset integration length for each measurement
+		if(!mlBert_SetBERCounter(g_hBert, m_integrationLength / 25000))
+			LogError("Failed to set BER counter\n");
+
+		//Read all four channel BERs and report values
+		double values[4] = {0};
+		if(!mlBert_DoInstantBER(g_hBert, values))
+			LogError("Failed to read BER\n");
+
+		char tmp[256];
+		snprintf(tmp, sizeof(tmp), "%e,%e,%e,%e", values[0], values[1], values[2], values[3]);
+		SendReply(tmp);
+	}
+
 	//Channel queries
 	else if(subject != "")
 	{
@@ -366,7 +400,7 @@ bool BertServer::OnQuery(
 				double* bervalues = new double[paddedSize];
 
 				if(!mlBert_GetEye(g_hBert, chnum, xvalues, yvalues, bervalues))
-					LogError("Failed to get eye");
+					LogError("Failed to get eye\n");
 
 				//X and Y values are redundant so don't waste bandwidth sending them
 				//All we really need are the point spacings
@@ -400,25 +434,92 @@ bool BertServer::OnQuery(
 				LogDebug("Horizontal bathtub for channel %d\n", chnum);
 
 				//Read a quick bathtub
-				//Docs say we only need 128 entries but we get memory corruption
-				//unless we allocate a lot more space. but we still get random failures....
+				//Docs say we only need 128 entries but we get memory corruption unless we allocate a lot more space.
+				//But we still get random failures with infinities, out of order points, etc
+				/*
 				double xvalues[2048] = {0};
 				double berValues[2048] = {0};
 				if(!mlBert_GetBathTub(g_hBert, chnum, xvalues, berValues))
 					LogError("Failed to get bathtub\n");
+				*/
 
-				//this sometimes fails and gives garbage data for no obvious reason
-				if(!mlBert_CalculateBathtubDualDirac(g_hBert, chnum, xvalues, berValues))
-					LogError("Failed to do dual dirac\n");
+				//Acquire an eye pattern then grab a slice across it to make the eye
+				size_t paddedSize = 32768 + 1024;
+				double* xvalues = new double[paddedSize];
+				double* yvalues = new double[paddedSize];
+				double* bervalues = new double[paddedSize];
+
+				if (!mlBert_GetEye(g_hBert, chnum, xvalues, yvalues, bervalues))
+					LogError("Failed to get eye\n");
+
+				//Find the widest spot in the eye (seems to be slightly offset above the nominal midpoint ADC code)
+				int nrow = 0;
+				int opening = 0;
+				for(int y=0; y<256; y++)
+				{
+					//find right edge with ber at 1e-4 or worse
+					//(remember, indexing is right to left)
+					double threshold = 1e-4;
+					int left = 0;
+					int right = 0;
+					for(int x=63; x>=0; x--)
+					{
+						if(bervalues[y*128 + x] > threshold)
+						{
+							right = x+1;
+							break;
+						}
+					}
+
+					//repeat for left edge
+					for (int x = 64; x < 128; x++)
+					{
+						if (bervalues[y * 128 + x] > threshold)
+						{
+							left = x-1;
+							break;
+						}
+					}
+
+					int width = left - right;
+					if(width > opening)
+					{
+						opening = width;
+						nrow = y;
+					}
+
+					//LogDebug("opening at y=%d is %d (left=%d right=%d)\n", y, width, left, right);
+				}
+				LogDebug("widest opening is %d (at %d)\n", opening, nrow);
+
+				//eye is read right to left, so flip the row
+				//Dual-Dirac jitter extrapolation in the SDK
+				//sometimes corrupts stack so allocate extra space for it to scribble over
+				double selxvalues[256] = {0};
+				double selbervalues[256] = {0};
+				for(int i=0; i<128; i++)
+				{
+					selxvalues[i] = xvalues[128*nrow + 127 - i];
+					selbervalues[i] = bervalues[128 * nrow + 127 - i];
+				}
+
+				//we really need to replace this with something that works!
+				//For now, skip the DD outright and just give raw samples
+				//if(!mlBert_CalculateBathtubDualDirac(g_hBert, chnum, selxvalues, selbervalues))
+				//	LogError("Failed to do dual dirac\n");
 
 				char tmp[128];
 				string reply;
 				for(int i=0; i<128; i++)
 				{
-					snprintf(tmp, sizeof(tmp), "%f,%e,", (float)xvalues[i], (float)berValues[i]);
+					snprintf(tmp, sizeof(tmp), "%f,%e,", (float)selxvalues[i], (float)selbervalues[i]);
 					reply += tmp;
 				}
 				SendReply(reply);
+
+				delete[] xvalues;
+				delete[] yvalues;
+				delete[] bervalues;
 			}
 			else
 				return false;
