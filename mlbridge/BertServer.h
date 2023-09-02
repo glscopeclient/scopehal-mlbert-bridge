@@ -27,6 +27,8 @@ protected:
 	int m_rxPoly[4];
 	bool m_txInvert[4];
 	bool m_rxInvert[4];
+	int m_dx[4];
+	int m_dy[4];
 	int64_t m_integrationLength;
 
 	bool m_deferring;

@@ -19,9 +19,11 @@ BertServer::BertServer(ZSOCKET sock)
 		m_rxPoly[i] = 0;
 		m_txInvert[i] = false;
 		m_rxInvert[i] = false;
+		m_dx[i] = 0;
+		m_dy[i] = 0;
 	}
 
-	m_integrationLength = 1e6;
+	m_integrationLength = (int64_t)1e7;
 }
 
 BertServer::~BertServer()
@@ -184,6 +186,15 @@ bool BertServer::OnCommand(
 				RefreshChannelPolynomialAndInvert(chnum);
 		}
 
+		else if (cmd == "SAMPLE")
+		{
+			//sampling point x (ps), y(V) in arg0 and arg1
+			LogDebug("Setting sampling point for channel %s to (%s ps, %s mV)\n", subject.c_str(), args[0].c_str(), args[1].c_str());
+
+			m_dx[chnum] = (int)atof(args[0].c_str());
+			m_dy[chnum] = (int)atof(args[1].c_str());
+		}
+			
 		else if (cmd == "CTLESTEP")
 		{
 			//CTLE gain step
@@ -358,12 +369,15 @@ bool BertServer::OnQuery(
 		//APICALL int  STACKMODE mlBert_ChangeBERPhaseAndOffset_pS_mV(mlbertapi* instance, int Channel, int phase, int Amplitude);
 		for(int i=0; i<4; i++)
 		{
-			if(!mlBert_ChangeBERPhase(g_hBert, i, 64, 128))
+			if(!mlBert_ChangeBERPhaseAndOffset_pS_mV(g_hBert, i, m_dx[i], m_dy[i]))
 				LogError("Failed to set BER phase\n");
+
+			//if(!mlBert_ChangeBERPhase(g_hBert, i, 64, 128))
+			//	LogError("Failed to set BER phase\n");
 		}
 
 		//Reset integration length for each measurement
-		if(!mlBert_SetBERCounter(g_hBert, m_integrationLength / 25000))
+		if(!mlBert_SetBERCounter(g_hBert, static_cast<uint32_t>(m_integrationLength / 25000L)))
 			LogError("Failed to set BER counter\n");
 
 		//Read all four channel BERs and report values
