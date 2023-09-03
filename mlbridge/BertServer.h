@@ -32,6 +32,12 @@ protected:
 	int64_t m_integrationLength;
 	double m_dataRateGbps;
 	bool m_useExternalRefclk;
+	int m_precursor[4];
+	int m_postcursor[4];
+	bool m_rxEnable[4];
+	bool m_txEnable[4];
+	float m_txSwing[4];
+	int m_ctleStep[4];
 
 	bool m_deferring;
 

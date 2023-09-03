@@ -21,6 +21,12 @@ BertServer::BertServer(ZSOCKET sock)
 		m_rxInvert[i] = false;
 		m_dx[i] = 0;
 		m_dy[i] = 0;
+		m_precursor[i] = 0;
+		m_postcursor[i] = 0;
+		m_txEnable[i] = true;
+		m_rxEnable[i] = true;
+		m_txSwing[i] = 200;
+		m_ctleStep[i] = 4;
 	}
 
 	m_integrationLength = (int64_t)1e7;
@@ -112,6 +118,7 @@ bool BertServer::OnCommand(
 			bool en = false;
 			if(args[0] == "1")
 				en = true;
+			m_txEnable[chnum] = en;
 
 			if(!mlBert_TXEnable(g_hBert, chnum, en))
 				LogError("Failed to set TX enable\n");
@@ -119,17 +126,17 @@ bool BertServer::OnCommand(
 
 		else if (cmd == "PRECURSOR")
 		{
-			int value = atoi(args[0].c_str());
+			m_precursor[chnum] = atoi(args[0].c_str());
 
-			if(!mlBert_PreEmphasis(g_hBert, chnum, value))
+			if(!mlBert_PreEmphasis(g_hBert, chnum, m_precursor[chnum]))
 				LogError("Failed to set precursor tap\n");
 		}
 
 		else if (cmd == "POSTCURSOR")
 		{
-			int value = atoi(args[0].c_str());
+			m_postcursor[chnum] = atoi(args[0].c_str());
 
-			if (!mlBert_PostEmphasis(g_hBert, chnum, value))
+			if (!mlBert_PostEmphasis(g_hBert, chnum, m_postcursor[chnum]))
 				LogError("Failed to set postcursor tap\n");
 		}
 
@@ -150,8 +157,9 @@ bool BertServer::OnCommand(
 		else if (cmd == "SWING")
 		{
 			LogDebug("Setting swing for %s to %s\n", subject.c_str(), args[0].c_str());
+			m_txSwing[chnum] = (float)atof(args[0].c_str());
 
-			if(!mlBert_OutputLevel(g_hBert, chnum, atof(args[0].c_str())))
+			if(!mlBert_OutputLevel(g_hBert, chnum, m_txSwing[chnum]))
 				LogError("Failed to set swing\n");
 		}
 
@@ -206,7 +214,9 @@ bool BertServer::OnCommand(
 			LogDebug("Setting CTLE step for channel %s to %s\n", subject.c_str(), args[0].c_str());
 			auto step = atoi(args[0].c_str());
 
-			if(!mlBert_DFESetValue(g_hBert, chnum, step))
+			m_ctleStep[chnum] = step;
+
+			if (!mlBert_DFESetValue(g_hBert, chnum, step))
 				LogError("Failed to set tap value\n");
 		}
 
@@ -359,16 +369,11 @@ bool BertServer::OnQuery(
 
 	else if(cmd == "BER")
 	{
-		//TODO: make this configurable
-		//take measurement at center of eye
-		//APICALL int  STACKMODE mlBert_ChangeBERPhaseAndOffset_pS_mV(mlbertapi* instance, int Channel, int phase, int Amplitude);
+		//Set sampling point
 		for(int i=0; i<4; i++)
 		{
 			if(!mlBert_ChangeBERPhaseAndOffset_pS_mV(g_hBert, i, m_dx[i], m_dy[i]))
 				LogError("Failed to set BER phase\n");
-
-			//if(!mlBert_ChangeBERPhase(g_hBert, i, 64, 128))
-			//	LogError("Failed to set BER phase\n");
 		}
 
 		//Reset integration length for each measurement
@@ -562,8 +567,6 @@ bool BertServer::OnQuery(
 	LogVerbose("Temperatures: TX=%.1f, RX=%.1f\n", temp0, temp1);
 	*/
 
-	//APICALL int  STACKMODE mlBert_GetEye(mlbertapi* instance, int channel, double *xValues, double *yValues, double *berValues);
-
 	else
 		return false;
 
@@ -572,7 +575,7 @@ bool BertServer::OnQuery(
 
 void BertServer::RefreshTimebase()
 {
-	LogDebug("Setting line rate to %f Gbps\n", m_dataRateGbps);
+	LogDebug("Setting line rate to %f Gbps with %s reference\n", m_dataRateGbps, m_useExternalRefclk ? "external" : "internal");
 
 	// Line rate in Gbps, clock index 0=external, 1=internal
 	if (!mlBert_LineRateConfiguration(g_hBert, m_dataRateGbps, m_useExternalRefclk ? 0 : 1))
@@ -582,10 +585,24 @@ void BertServer::RefreshTimebase()
 	//so don't restore config because we're about to reconfigure everything anyway
 	if (!m_deferring)
 	{
-		if (!mlBert_RestoreAllConfig(g_hBert))
-			LogError("Failed to restore config\n");
+		LogDebug("Restoring config and refreshing channels\n");
 
 		for (int i = 0; i < 4; i++)
+		{
 			RefreshChannelPolynomialAndInvert(i);
+
+			if (!mlBert_PreEmphasis(g_hBert, i, m_precursor[i]))
+				LogError("Failed to set precursor tap\n");
+			if (!mlBert_PostEmphasis(g_hBert, i, m_postcursor[i]))
+				LogError("Failed to set postcursor tap\n");
+			if (!mlBert_TXEnable(g_hBert, i, m_txEnable[i]))
+				LogError("Failed to set TX enable\n");
+			if (!mlBert_RXEnable(g_hBert, i, m_rxEnable[i]))
+				LogError("Failed to set RX enable\n");
+			if (!mlBert_OutputLevel(g_hBert, i, m_txSwing[i]))
+				LogError("Failed to set swing\n");
+			if (!mlBert_DFESetValue(g_hBert, i, m_ctleStep[i]))
+				LogError("Failed to set tap value\n");
+		}
 	}
 }
