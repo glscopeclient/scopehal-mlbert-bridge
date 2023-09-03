@@ -24,6 +24,8 @@ BertServer::BertServer(ZSOCKET sock)
 	}
 
 	m_integrationLength = (int64_t)1e7;
+	m_dataRateGbps = 10.3125;
+	m_useExternalRefclk = false;
 }
 
 BertServer::~BertServer()
@@ -270,6 +272,15 @@ bool BertServer::OnCommand(
 					LogError("failed to set clock out mux\n");
 			}
 		}
+		else if (cmd == "REFCLK")
+		{
+			if(args[0] == "EXT")
+				m_useExternalRefclk = true;
+			else
+				m_useExternalRefclk = false;
+
+			RefreshTimebase();
+		}
 		else if (cmd == "USERPATTERN")
 		{
 			uint64_t userpattern = 0;
@@ -292,8 +303,8 @@ bool BertServer::OnCommand(
 		{
 			LogDebug("Applying deferred channel config\n");
 
-			for(int i=0; i<4; i++)
-				RefreshChannelPolynomialAndInvert(chnum);
+			for (int i = 0; i < 4; i++)
+				RefreshChannelPolynomialAndInvert(i);
 
 			m_deferring = false;
 		}
@@ -304,25 +315,9 @@ bool BertServer::OnCommand(
 		else if (cmd == "RATE")
 		{
 			int64_t bps = stoll(args[0].c_str());
-			double gbps = bps * 1e-9;
+			m_dataRateGbps = bps * 1e-9;
 
-			//TODO: support ext ref clk
-			
-			// Line rate in Gbps, clock index 0=external, 1=internal
-			LogDebug("Setting line rate to %f Gbps\n", gbps);
-			if(!mlBert_LineRateConfiguration(g_hBert, gbps, 1))
-				LogError("Failed to set line rate\n");
-
-			//if in DEFER mode, we're doing initial startup
-			//so don't restore config because we're about to reconfigure everything anyway
-			if(!m_deferring)
-			{
-				if (!mlBert_RestoreAllConfig(g_hBert))
-					LogError("Failed to restore config\n");
-
-				for (int i = 0; i < 4; i++)
-					RefreshChannelPolynomialAndInvert(chnum);
-			}
+			RefreshTimebase();
 		}
 		else
 		{
@@ -573,4 +568,24 @@ bool BertServer::OnQuery(
 		return false;
 
 	return true;
+}
+
+void BertServer::RefreshTimebase()
+{
+	LogDebug("Setting line rate to %f Gbps\n", m_dataRateGbps);
+
+	// Line rate in Gbps, clock index 0=external, 1=internal
+	if (!mlBert_LineRateConfiguration(g_hBert, m_dataRateGbps, m_useExternalRefclk ? 0 : 1))
+		LogError("Failed to set line rate\n");
+
+	//if in DEFER mode, we're doing initial startup
+	//so don't restore config because we're about to reconfigure everything anyway
+	if (!m_deferring)
+	{
+		if (!mlBert_RestoreAllConfig(g_hBert))
+			LogError("Failed to restore config\n");
+
+		for (int i = 0; i < 4; i++)
+			RefreshChannelPolynomialAndInvert(i);
+	}
 }

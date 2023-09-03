@@ -30,6 +30,10 @@ protected:
 	int m_dx[4];
 	int m_dy[4];
 	int64_t m_integrationLength;
+	double m_dataRateGbps;
+	bool m_useExternalRefclk;
 
 	bool m_deferring;
+
+	void RefreshTimebase();
 };
