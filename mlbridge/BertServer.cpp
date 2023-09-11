@@ -361,7 +361,7 @@ bool BertServer::OnQuery(
 	{
 		char tmp[256];
 		snprintf(tmp, sizeof(tmp),
-			"MultiLANE,ML%d,%016llx,0.0",
+			"multiLane,ML%d,%016llx,0.0",
 			g_model,
 			g_serial);
 		SendReply(tmp);
